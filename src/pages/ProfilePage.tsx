@@ -1,0 +1,23 @@
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
+import { Save, RotateCcw, Sparkles, BookOpen, Trophy, ArrowUpRight } from 'lucide-react'
+import { useAppStore, useProfile } from '../stores/useAppStore'
+import { initials } from '../lib/utils'
+import { totalXP, lessonCount, courseComplete } from '../services/progress'
+import { achievements } from '../data/achievements'
+import { courses } from '../data/courses'
+import { AchievementBadge, EmptyState, PageHeader, StatCard } from '../components/ui/common'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { Button } from '../components/ui/button'
+const schema = z.object({ name: z.string().trim().min(2, 'Bruk minst to tegn.').max(80, 'Bruk høyst 80 tegn.'), email: z.email('Skriv en gyldig e-postadresse.') })
+export default function ProfilePage() {
+  const profile = useProfile()!
+  const { editProfile, resetProgress } = useAppStore()
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { name: profile.name, email: profile.email } })
+  const finished = courses.filter(c => courseComplete(profile.progress, c))
+  const xp = totalXP(profile.progress)
+  return <><PageHeader eyebrow="DETTE ER DIN REISE" title="Min profil" description="Dine små seire, nye ferdigheter og neste milepæler." /><div className="profile-banner"><span className="avatar avatar-large">{initials(profile.name)}</span><div><h2>{profile.name}</h2><p>{profile.email}</p><span className="tag">Demoprofil · Med siden {new Date(profile.createdAt).toLocaleDateString('nb-NO', { month: 'long', year: 'numeric' })}</span></div><div className="profile-level"><Sparkles size={21} /><span>Nivå {Math.floor(xp / 150) + 1}</span><small>{xp} XP opptjent</small></div></div><div className="profile-layout"><section className="panel profile-form"><h3>Profilopplysninger</h3><p className="muted">Bruk oppdiktede opplysninger i demoen.</p><form onSubmit={handleSubmit(async data => { try { editProfile(data.name, data.email); toast.success('Profilen er oppdatert.') } catch (e) { toast.error((e as Error).message) } })} noValidate><div className="form-field"><label htmlFor="profile-name">Visningsnavn</label><input id="profile-name" {...register('name')} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'profile-name-error' : undefined} />{errors.name && <p id="profile-name-error" className="field-error">{errors.name.message}</p>}</div><div className="form-field"><label htmlFor="profile-email">E-postadresse</label><input id="profile-email" type="email" {...register('email')} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'profile-email-error' : undefined} />{errors.email && <p id="profile-email-error" className="field-error">{errors.email.message}</p>}</div><Button disabled={isSubmitting}><Save size={16} /> Lagre endringer</Button></form></section><div className="profile-stats"><StatCard icon={<BookOpen size={18} />} value={lessonCount(profile.progress)} label="Leksjoner fullført" detail="Av 9 tilgjengelige leksjoner" /><StatCard icon={<Trophy size={18} />} value={achievements.filter(a => a.unlocked(profile.progress)).length} label="Merker låst opp" detail="Av 5 mulige milepæler" color="amber" /></div></div><section className="panel mt-6"><div className="panel-heading"><div><h3>Dine utmerkelser</h3><p>Merker låses opp når du faktisk fullfører aktivitetene.</p></div></div><div className="achievement-grid">{achievements.map(a => <AchievementBadge key={a.id} {...a} unlocked={a.unlocked(profile.progress)} />)}</div></section><section className="panel mt-6"><div className="panel-heading"><h3>Fullførte kurs</h3><span className="tag">{finished.length} / 3</span></div>{finished.length ? finished.map(c => <Link className="completed-course" key={c.id} to={`/courses/${c.id}`}><Trophy size={20} /><span>{c.title}</span><span>Fullført</span><ArrowUpRight size={17} /></Link>) : <EmptyState title="Ditt første kursmerke venter" description="Fullfør alle leksjonene og bestå quizen i et kurs for å se det her." />}</section><section className="danger-panel"><div><h3>Begynn på nytt</h3><p>Nullstill leksjoner, quizresultater, XP og merker for denne profilen.</p></div><ConfirmDialog title="Nullstille fremgangen din?" description="Alle leksjoner, quizresultater, XP og merker for denne profilen blir slettet. Dette kan ikke angres. Profilopplysningene beholdes." onConfirm={resetProgress} trigger={<Button variant="secondary"><RotateCcw size={16} /> Nullstill fremgang</Button>} /></section></>
+}
